@@ -19,6 +19,11 @@ type City struct {
 	Population  int    `json:"population" db:"Population"`
 }
 
+type Country struct {
+	Name       string `json:"name" db:"Name"`
+	Population int    `json:"population" db:"Population"`
+}
+
 func main() {
 	var cityName string
 
@@ -36,7 +41,10 @@ func main() {
 
 	fmt.Println("Connected!")
 
-	var city City
+	var (
+		city    City
+		country Country
+	)
 
 	if err := db.Get(&city, fmt.Sprintf("SELECT * FROM city WHERE Name = '%s'", cityName)); errors.Is(err, sql.ErrNoRows) {
 		log.Printf("No such city that Name = '%s'", cityName)
@@ -44,5 +52,11 @@ func main() {
 		log.Fatalf("DB error: %s", err)
 	}
 
+	if err := db.Get(&country, fmt.Sprintf("SELECT Name, Population FROM country WHERE Code = '%s'", city.CountryCode)); err != nil {
+		log.Fatalf("DB error: %s", err)
+	}
+
 	fmt.Printf("The population of the city '%s' is %d\n", cityName, city.Population)
+	fmt.Printf("The population of the city '%s' is %f%% of the population of its country '%s'\n",
+		city.Name, float64(city.Population)/float64(country.Population)*100, country.Name)
 }
