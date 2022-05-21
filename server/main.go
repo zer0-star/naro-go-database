@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -53,6 +55,8 @@ func Run(cmd *cobra.Command, args []string) {
 	e.GET("/city/:name", getCityHandler)
 
 	e.POST("/city", postCityHandler)
+
+	e.GET("/cities", getCitiesHandler)
 
 	e.Start(":10201")
 }
@@ -103,4 +107,44 @@ func postCityHandler(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, city)
+}
+
+func getCitiesHandler(c echo.Context) error {
+	limit := 10
+
+	if c.QueryParams().Has("limit") {
+		_limit, err := strconv.Atoi(c.QueryParam("limit"))
+
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("%s", err))
+		}
+
+		limit = _limit
+	}
+
+	orderBy := "ID"
+
+	if c.QueryParams().Has("orderBy") {
+		orderBy = c.QueryParam("orderBy")
+		if !(orderBy == "ID" || orderBy == "Name" || orderBy == "CountryCode" || orderBy == "District" || orderBy == "Population") {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unknown column: %s", orderBy))
+		}
+	}
+
+	order := "ASC"
+
+	if c.QueryParams().Has("order") {
+		order = c.QueryParam("order")
+		if !(strings.EqualFold(order, "ASC") || strings.EqualFold(order, "DESC")) {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("order must be 'ASC' or 'DESC' (case insensitive), but got: %s", order))
+		}
+	}
+
+	var cities []City
+
+	if err := db.Select(&cities, "SELECT * FROM city ORDER BY "+orderBy+" "+order+" LIMIT ?", limit); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("DB error: %s", err))
+	}
+
+	return c.JSON(http.StatusOK, cities)
 }
